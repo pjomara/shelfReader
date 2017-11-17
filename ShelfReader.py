@@ -1,7 +1,19 @@
 #! /usr/bin/python3
 
-''' This version of shelfReader is written to work in Python version 3.x
-and in Linux/ Mac OS.  This version does not use the Winsounds library.
+''' This version of AshelfReader uses beep character ('\a') to generate notification beeps
+ This version should be cross OS compatible as it does  not use a Unix command-line
+ program (aplay) or a windows-only Python module (winsound).
+
+ Accepted inputs:
+    Scanned barcodes
+    1 to exit program
+
+ Notifications:
+ 1-beep -- book shelved correctly
+ 2-beeps -- book misshelved
+ 3-beeps -- previous book misshelved
+ 4-beeps -- call numbers are identical
+ 5-beeps -- barcode not found in database
 
 ShelfReader is an application that partially automates the process of
 shelf reading.
@@ -22,35 +34,78 @@ Copyright (C) 2015  Parker O'Mara (pomar001@plattsburgh.edu)
 
 import sqlite3
 import sys
-import os
 
 def main():
 
-    barcode= ()
-    while barcode != 1:
-    barcode = input ("Scan the first barcode: ")
-        complete_call= call_grabber(barcode)
-        call, description = complete_call
-        call_test(call)
-        parse_call= call_parser(call)
-        second_last_call= ('','','','','','','','','')
+        barcode = eval(input("Scan the first barcode: "))
+        if barcode ==1:
+            print("User exited program.")
+            sys.exit()
+        else:
+            check= barcodeCheck(barcode)
+        while check==0:
+            not_found()
+            barcode = eval(input("Scan the first barcode: "))
+            if barcode == 1:
+                print("User exited program.")
+                sys.exit()
+            else:
+                check = barcodeCheck(barcode)
+        else:
+            complete_call= call_grabber(barcode)
+            call, description = complete_call
+            call_test(call)
+            parse_call= call_parser(call)
+            second_last_call= ('','','','','','','','','')
 
         while parse_call:
-            next_barcode = input("Scan the next barcode: ")
+            next_barcode = eval(input("Scan the next barcode: "))
             if next_barcode == 1:
-                logger(bookCount,startTime,next_barcode)
-            next_complete_call = call_grabber(next_barcode)
-            next_call, next_description= next_complete_call
-            while next_call is None:
+                print("User exited program.")
+                sys.exit()
+            check = barcodeCheck(next_barcode)
+            while check == 0:
                 not_found()
-            next_barcode = input("Scan the next barcode: ")
-            next_complete_call = call_grabber(next_barcode)
-            next_call, next_description = next_complete_call
-            next_call = next_call + ' ' + next_description
-            parse_next_call = call_parser(next_call)
-            comparer(parse_call, parse_next_call, second_last_call)
-            second_last_call= parse_call
-            parse_call = parse_next_call
+                next_barcode = input("Scan the next barcode: ")
+                if next_barcode == 1:
+                    print("User exited program.")
+                    sys.exit()
+                check = barcodeCheck(next_barcode)
+            else:
+                next_complete_call = call_grabber(next_barcode)
+                next_call, next_description= next_complete_call
+                while next_call is None:
+                    not_found()
+                next_barcode = input("Scan the next barcode: ")
+                next_complete_call = call_grabber(next_barcode)
+                next_call, next_description = next_complete_call
+                next_call = next_call + ' ' + next_description
+                parse_next_call = call_parser(next_call)
+                comparer(parse_call, parse_next_call, second_last_call)
+                second_last_call= parse_call
+                parse_call = parse_next_call
+
+# barcode_checker- checks if scanned barcode is in database.
+# If not, asks for another barcode.
+def barcodeCheck(barcode):
+    conn = sqlite3.connect('gcCatalog.sqlite')
+    try:
+        c = conn.cursor()
+
+        try:
+            c.execute("select barcode from items where barcode = ?", (barcode,))
+            row = c.fetchone()
+            if row:
+                return 1
+            else:
+                not_found()
+                return 0
+
+        finally:
+            c.close()
+
+    finally:
+        conn.close()
 
 # call_grabber, using the barcode, queries the database and returns
 # the call number and description.
@@ -341,26 +396,33 @@ def comparer(call, next_call, second_last_call):
 
 # Audio and text output messages.
 def correct(next_call):
-    #os.system("aplay shelfReaderSounds/correct.wav")
     print('\a')
     print (next_call,' is shelved correctly.')
 
 def misshelved(next_call):
-    #os.system("aplay shelfReaderSounds/misshelved.wav")
-    print('\a)
+    print('\a')
     print('\a')
     print (next_call,' is misshelved.')
 
 def identical():
-    os.system("aplay shelfReaderSounds/identical.wav")
+    print('\a')
+    print('\a')
+    print('\a')
+    print('\a')
     print ('The call numbers are identical.')
 
 def prev_misshelved(call):
-    os.system("aplay shelfReaderSounds/prevMisshelved.wav")
+    print('\a')
+    print('\a')
+    print('\a')
     print ('The previous book, ',call,', is misshelved.')
 
 def not_found():
-    os.system("aplay shelfReaderSounds/notFound.wav")
+    print('\a')
+    print('\a')
+    print('\a')
+    print('\a')
+    print('\a')
     print ('Barcode not found in database.')
 
 main()
